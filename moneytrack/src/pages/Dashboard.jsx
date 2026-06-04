@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import ProfilePage from './ProfilePage'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 
@@ -67,6 +68,7 @@ export default function Dashboard() {
   const [currency, setCurrency] = useState('THB')
   const [darkMode, setDarkMode] = useState(false)
   const [modal, setModal] = useState(null)
+  const [showProfile, setShowProfile] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -91,6 +93,20 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Check upcoming subscriptions and notify
+  useEffect(() => {
+    if (subs.length === 0) return
+    const today = new Date().getDate()
+    const upcoming = subs.filter(s => s.billing_day >= today && s.billing_day <= today + 3)
+    upcoming.forEach(s => {
+      const diff = s.billing_day - today
+      sendPushNotification(
+        'MoneyTrack — ใกล้ถึงวันตัดบัญชี',
+        `${s.name} จะหักเงิน ${s.amount} บาท ${diff === 0 ? 'วันนี้' : 'ใน ' + diff + ' วัน'}`
+      )
+    })
+  }, [subs])
 
   const uploadImage = async (file, folder) => {
     if (!file) return null
@@ -168,6 +184,13 @@ export default function Dashboard() {
     setTxns(prev => prev.filter(t => t.id !== id))
   }
 
+  // Push notification helper
+  const sendPushNotification = (title, body) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/pwa-192x192.png' })
+    }
+  }
+
   const signOut = () => supabase.auth.signOut()
 
   const totalSubs = subs.reduce((s, x) => s + Number(x.amount), 0)
@@ -235,6 +258,8 @@ export default function Dashboard() {
     </div>
   )
 
+  if (showProfile) return <ProfilePage onBack={() => setShowProfile(false)} darkMode={darkMode} setDarkMode={setDarkMode} />
+
   return (
     <div style={s.wrap}>
       {/* Topbar */}
@@ -250,6 +275,7 @@ export default function Dashboard() {
           <button onClick={() => setDarkMode(p => !p)} style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 15 }}>
             <i className={`ti ${darkMode ? 'ti-sun' : 'ti-moon'}`} />
           </button>
+          <button onClick={() => setShowProfile(true)} style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 15 }}><i className="ti ti-user-circle" aria-hidden="true" /></button>
           <button onClick={signOut} style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }}>
             <i className="ti ti-logout" aria-hidden="true" /><span style={{ display: 'none' }}>ออกจากระบบ</span>
           </button>
