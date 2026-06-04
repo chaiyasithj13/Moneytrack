@@ -243,9 +243,9 @@ export default function Dashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <select value={currency} onChange={e => setCurrency(e.target.value)}
             style={{ background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.2)', color: '#fff', borderRadius: 8, padding: '5px 8px', fontSize: 13, fontFamily: 'var(--font)', cursor: 'pointer' }}>
-            <option value="THB">฿ บาท</option>
-            <option value="USD">$ USD</option>
-            <option value="EUR">€ EUR</option>
+            <option value="THB" style={{background:'#1a3c8f',color:'#fff'}}>฿ บาท</option>
+            <option value="USD" style={{background:'#1a3c8f',color:'#fff'}}>$ USD</option>
+            <option value="EUR" style={{background:'#1a3c8f',color:'#fff'}}>€ EUR</option>
           </select>
           <button onClick={() => setDarkMode(p => !p)} style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 15 }}>
             <i className={`ti ${darkMode ? 'ti-sun' : 'ti-moon'}`} />
