@@ -204,9 +204,9 @@ export default function Dashboard() {
     wrap: { minHeight: '100vh', background: 'var(--bg)' },
     topbar: { background: 'var(--primary)', padding: '13px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     logo: { fontSize: 18, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 },
-    nav: { display: 'inline-flex', background: 'var(--bg2)', borderBottom: '1px solid var(--border)', padding: '0 20px', overflowX: 'auto', width: 'fit-content' },
-    nb: { padding: '11px 14px', border: 'none', background: 'none', color: 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: '2.5px solid transparent', display: 'inline-block', fontFamily: 'var(--font)', whiteSpace: 'nowrap' },
-    nbActive: { color: 'var(--primary)', borderBottomColor: 'var(--primary)' },
+    nav: { display: 'flex', background: 'var(--bg2)', borderBottom: '1px solid var(--border)', padding: '0 20px', overflowX: 'auto' },
+    nb: { padding: '11px 14px', border: 'none', background: 'none', color: 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: '2.5px solid transparent', fontFamily: 'var(--font)', whiteSpace: 'nowrap' },
+    nbActive: { color: 'var(--primary)', borderBottom: '2.5px solid var(--primary)' },
     content: { padding: 20, maxWidth: 900, margin: '0 auto' },
     grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 },
     card: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 },
@@ -243,9 +243,9 @@ export default function Dashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <select value={currency} onChange={e => setCurrency(e.target.value)}
             style={{ background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.2)', color: '#fff', borderRadius: 8, padding: '5px 8px', fontSize: 13, fontFamily: 'var(--font)', cursor: 'pointer' }}>
-            <option value="THB" style={{background:'#1a3c8f',color:'#fff'}}>฿ บาท</option>
-            <option value="USD" style={{background:'#1a3c8f',color:'#fff'}}>$ USD</option>
-            <option value="EUR" style={{background:'#1a3c8f',color:'#fff'}}>€ EUR</option>
+            <option value="THB">฿ บาท</option>
+            <option value="USD">$ USD</option>
+            <option value="EUR">€ EUR</option>
           </select>
           <button onClick={() => setDarkMode(p => !p)} style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 15 }}>
             <i className={`ti ${darkMode ? 'ti-sun' : 'ti-moon'}`} />
