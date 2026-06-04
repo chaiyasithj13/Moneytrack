@@ -205,7 +205,7 @@ export default function Dashboard() {
     topbar: { background: 'var(--primary)', padding: '13px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     logo: { fontSize: 18, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 },
     nav: { display: 'flex', background: 'var(--bg2)', borderBottom: '1px solid var(--border)', padding: '0 20px', overflowX: 'auto' },
-    nb: { padding: '11px 14px', border: 'none', background: 'none', color: 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: '2.5px solid transparent', fontFamily: 'var(--font)', whiteSpace: 'nowrap' },
+    nb: { padding: '11px 14px', border: 'none', background: 'none', color: 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: '2.5px solid transparent', display: 'inline-block', fontFamily: 'var(--font)', whiteSpace: 'nowrap' },
     nbActive: { color: 'var(--primary)', borderBottomColor: 'var(--primary)' },
     content: { padding: 20, maxWidth: 900, margin: '0 auto' },
     grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 },
