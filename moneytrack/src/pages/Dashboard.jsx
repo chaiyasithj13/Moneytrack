@@ -69,6 +69,7 @@ export default function Dashboard() {
   const [darkMode, setDarkMode] = useState(false)
   const [modal, setModal] = useState(null)
   const [showProfile, setShowProfile] = useState(false)
+  const [selectedMonth, setSelectedMonth] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -326,17 +327,31 @@ export default function Dashboard() {
                         <span style={{ fontSize: 10, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 3, background: 'var(--red)', display: 'inline-block', borderRadius: 2 }} />จ่าย</span>
                       </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100 }}>
                       {chartMonths.map((m, i) => (
-                        <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: 2, height: 90 }}>
-                          <div style={{ width: '50%', height: Math.round((chartInc[i] / maxV) * 82), background: 'var(--teal)', borderRadius: '4px 4px 0 0', minHeight: 3 }} />
-                          <div style={{ width: '50%', height: Math.round((chartExp[i] / maxV) * 82), background: 'var(--red)', borderRadius: '4px 4px 0 0', minHeight: 3 }} />
+                        <div key={i} onClick={() => setSelectedMonth({ monthIdx: m, monthName: MONTHS[m], inc: chartInc[i], exp: chartExp[i] })}
+                          style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', gap: 2 }}>
+                          <div style={{ width: '100%', display: 'flex', alignItems: 'flex-end', gap: 1, height: 82 }}>
+                            <div style={{ width: '50%', height: Math.round((chartInc[i] / maxV) * 82), background: 'var(--teal)', borderRadius: '4px 4px 0 0', minHeight: 3, transition: '.2s', opacity: selectedMonth && selectedMonth.monthIdx === m ? 1 : 0.75 }} />
+                            <div style={{ width: '50%', height: Math.round((chartExp[i] / maxV) * 82), background: 'var(--red)', borderRadius: '4px 4px 0 0', minHeight: 3, transition: '.2s', opacity: selectedMonth && selectedMonth.monthIdx === m ? 1 : 0.75 }} />
+                          </div>
+                          <div style={{ fontSize: 10, color: selectedMonth && selectedMonth.monthIdx === m ? 'var(--primary)' : 'var(--muted)', fontWeight: selectedMonth && selectedMonth.monthIdx === m ? 700 : 400 }}>{MONTHS[m]}</div>
                         </div>
                       ))}
                     </div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
-                      {chartMonths.map((m, i) => <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: 'var(--muted)' }}>{MONTHS[m]}</div>)}
-                    </div>
+                    {selectedMonth && (
+                      <div style={{ marginTop: 10, background: 'var(--bg3)', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{selectedMonth.monthName} {new Date().getFullYear()}</div>
+                          <div style={{ display: 'flex', gap: 16 }}>
+                            <div><div style={{ fontSize: 10, color: 'var(--muted)' }}>รายรับ</div><div style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal)' }}>{fmt(selectedMonth.inc, currency)}</div></div>
+                            <div><div style={{ fontSize: 10, color: 'var(--muted)' }}>รายจ่าย</div><div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{fmt(selectedMonth.exp, currency)}</div></div>
+                            <div><div style={{ fontSize: 10, color: 'var(--muted)' }}>คงเหลือ</div><div style={{ fontSize: 13, fontWeight: 700, color: selectedMonth.inc - selectedMonth.exp >= 0 ? 'var(--teal)' : 'var(--red)' }}>{fmt(selectedMonth.inc - selectedMonth.exp, currency)}</div></div>
+                          </div>
+                        </div>
+                        <button onClick={() => { setSelectedMonth(null); setTab('transactions') }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>ดูรายการ →</button>
+                      </div>
+                    )}
                   </div>
 
                   <div style={s.card}>
@@ -442,26 +457,60 @@ export default function Dashboard() {
             )}
 
             {/* ===== TRANSACTIONS ===== */}
-            {tab === 'transactions' && (
+            {tab === 'transactions' && (() => {
+              const now = new Date()
+              const allMonths = Array.from({ length: 12 }, (_, i) => {
+                const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1)
+                return { month: d.getMonth(), year: d.getFullYear(), label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}` }
+              }).reverse()
+              const [filterMonth, setFilterMonth] = window._txnFilter || [null, () => {}]
+              // use local state via a trick - store in window temporarily
+              if (!window._txnFilterState) window._txnFilterState = { val: null }
+              const curFilter = window._txnFilterState.val
+              const setFilter = (v) => { window._txnFilterState.val = v; setTab('transactions') }
+
+              const filteredTxns = curFilter
+                ? txns.filter(t => {
+                    const d = new Date(t.date)
+                    return d.getMonth() === curFilter.month && d.getFullYear() === curFilter.year
+                  })
+                : txns
+
+              const filtInc = filteredTxns.filter(t => t.type === 'income').reduce((s, x) => s + Number(x.amount), 0)
+              const filtExp = filteredTxns.filter(t => t.type === 'expense').reduce((s, x) => s + Number(x.amount), 0) + (curFilter ? 0 : totalSubs())
+
+              return (
               <>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14, overflowX: 'auto', paddingBottom: 4 }}>
+                  <button onClick={() => { window._txnFilterState.val = null; setTab('transactions') }}
+                    style={{ flexShrink: 0, padding: '5px 12px', borderRadius: 20, border: '1.5px solid', borderColor: !curFilter ? 'var(--primary)' : 'var(--border)', background: !curFilter ? 'var(--primary)' : 'var(--bg3)', color: !curFilter ? '#fff' : 'var(--muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                    ทั้งหมด
+                  </button>
+                  {allMonths.slice(0, 6).map((mo, i) => (
+                    <button key={i} onClick={() => { window._txnFilterState.val = mo; setTab('transactions') }}
+                      style={{ flexShrink: 0, padding: '5px 12px', borderRadius: 20, border: '1.5px solid', borderColor: curFilter && curFilter.month === mo.month && curFilter.year === mo.year ? 'var(--primary)' : 'var(--border)', background: curFilter && curFilter.month === mo.month && curFilter.year === mo.year ? 'var(--primary)' : 'var(--bg3)', color: curFilter && curFilter.month === mo.month && curFilter.year === mo.year ? '#fff' : 'var(--muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                      {mo.label}
+                    </button>
+                  ))}
+                </div>
                 <div style={s.grid2}>
                   <div style={{ ...s.statBox, borderLeft: '3px solid var(--teal)' }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>รายรับเดือนนี้</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--teal)' }}>{fmt(totalInc, currency)}</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>{curFilter ? `รายรับ ${curFilter.label}` : 'รายรับเดือนนี้'}</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--teal)' }}>{fmt(filtInc, currency)}</div>
                   </div>
                   <div style={{ ...s.statBox, borderLeft: '3px solid var(--red)' }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>รายจ่ายเดือนนี้</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--red)' }}>{fmt(totalExp, currency)}</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>{curFilter ? `รายจ่าย ${curFilter.label}` : 'รายจ่ายเดือนนี้'}</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--red)' }}>{fmt(filtExp, currency)}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
                   <button style={s.addBtn} onClick={openAddTxn}><i className="ti ti-plus" aria-hidden="true" /> เพิ่มรายการ</button>
                 </div>
                 <div style={s.card}>
-                  <div style={s.ctitle}>รายการทั้งหมด</div>
-                  {txns.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: 20 }}>ยังไม่มีรายการครับ</div>}
-                  {txns.map((t, i) => (
-                    <div key={t.id} style={{ ...s.ir, borderBottom: i === txns.length - 1 ? 'none' : undefined, paddingBottom: i === txns.length - 1 ? 0 : undefined }}>
+                  <div style={s.ctitle}>{curFilter ? `รายการ ${curFilter.label}` : 'รายการทั้งหมด'} <span style={{ fontWeight: 400, color: 'var(--muted)' }}>({filteredTxns.length} รายการ)</span></div>
+                  {filteredTxns.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: 20 }}>ไม่มีรายการในเดือนนี้ครับ</div>}
+                  {filteredTxns.map((t, i) => (
+                    <div key={t.id} style={{ ...s.ir, borderBottom: i === filteredTxns.length - 1 ? 'none' : undefined, paddingBottom: i === filteredTxns.length - 1 ? 0 : undefined }}>
                       <ItemIcon item={{ ...t, color: t.type === 'income' ? '#00b894' : '#e84c4c', icon: t.type === 'income' ? 'ti-arrow-down-left' : 'ti-arrow-up-right' }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={s.iname}>{t.name}</div>
@@ -475,7 +524,8 @@ export default function Dashboard() {
                   ))}
                 </div>
               </>
-            )}
+              )
+            })()}
 
             {/* ===== ALERTS ===== */}
             {tab === 'alerts' && (
