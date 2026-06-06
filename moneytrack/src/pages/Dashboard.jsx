@@ -22,7 +22,7 @@ const CURR = { THB: { sym: '฿', rate: 1 }, USD: { sym: '$', rate: 0.027 }, EUR
 function fmt(v, currency) {
   const c = CURR[currency]
   const n = v * c.rate
-  if (currency === 'THB') return c.sym + Math.round(n).toLocaleString('th-TH')
+  if (currency === 'THB') return c.sym + n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   return c.sym + n.toFixed(2)
 }
 
