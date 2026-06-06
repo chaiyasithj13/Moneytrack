@@ -263,6 +263,31 @@ export default function Dashboard() {
     setSubs(prev => prev.filter(s => s.id !== id))
   }
 
+  const openEditSub = (sub) => {
+    setForm({ _editId: sub.id, name: sub.name, category: sub.category, amount: String(sub.amount), billing_day: String(sub.billing_day) })
+    setImgFile(null)
+    setImgPreview(sub.image_url || null)
+    setModal('edit-sub')
+  }
+
+  const updateSub = async () => {
+    if (!form.name || !form.amount) return
+    setSaving(true)
+    const meta = CAT_META[form.category] || CAT_META['อื่นๆ']
+    let image_url = imgPreview && imgPreview.startsWith('blob:') ? await uploadImage(imgFile, 'sub') : (imgPreview || null)
+    const { error } = await supabase.from('subscriptions').update({
+      name: form.name,
+      category: form.category,
+      amount: parseFloat(form.amount),
+      billing_day: parseInt(form.billing_day) || 1,
+      color: meta.color,
+      icon: meta.icon,
+      image_url,
+    }).eq('id', form._editId)
+    if (!error) { await loadData(); setModal(null) }
+    setSaving(false)
+  }
+
   const delTxn = async (id) => {
     await supabase.from('transactions').delete().eq('id', id)
     setTxns(prev => prev.filter(t => t.id !== id))
@@ -532,6 +557,7 @@ export default function Dashboard() {
                           {sub.billing_day >= today && sub.billing_day <= today + 7 ? 'เร็วๆนี้' : 'ปกติ'}
                         </span>
                       </div>
+                      <button style={{ ...s.delBtn, color: 'var(--primary)' }} onClick={() => openEditSub(sub)} aria-label="แก้ไข"><i className="ti ti-edit" /></button>
                       <button style={s.delBtn} onClick={() => delSub(sub.id)} aria-label="ลบ"><i className="ti ti-trash" /></button>
                     </div>
                   ))}
@@ -613,15 +639,60 @@ export default function Dashboard() {
         </Modal>
       )}
 
+      {modal === 'edit-sub' && (
+        <Modal title="แก้ไข Subscription" onClose={() => setModal(null)}>
+          {imgUploadBlock}
+          <label style={labelStyle}>ชื่อบริการ</label>
+          <input style={inputStyle} placeholder="เช่น Disney+" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+          <label style={labelStyle}>หมวดหมู่</label>
+          <select style={inputStyle} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
+            {Object.keys(CAT_META).filter(k => k !== 'รายได้').map(k => <option key={k}>{k}</option>)}
+          </select>
+          <label style={labelStyle}>ราคา (บาท/เดือน)</label>
+          <input style={inputStyle} type="number" placeholder="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
+          <label style={labelStyle}>วันตัดบัญชี (1-31)</label>
+          <input style={inputStyle} type="number" min="1" max="31" placeholder="1" value={form.billing_day} onChange={e => setForm(p => ({ ...p, billing_day: e.target.value }))} />
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <button style={btnSecondary} onClick={() => setModal(null)}>ยกเลิก</button>
+            <button style={{ ...btnPrimary, flex: 1, opacity: saving ? .7 : 1 }} onClick={updateSub} disabled={saving}>
+              {saving ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {/* ===== MODAL: Add Transaction ===== */}
       {modal === 'add-txn' && (
         <Modal title="เพิ่มรายรับ / รายจ่าย" onClose={() => setModal(null)}>
           {imgUploadBlock}
           <label style={labelStyle}>ประเภท</label>
-          <select style={inputStyle} value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
+          <select style={inputStyle} value={form.type} onChange={e => {
+            setForm(p => ({ ...p, type: e.target.value, name: '', amount: '', category: 'อาหาร' }))
+          }}>
             <option value="expense">รายจ่าย</option>
             <option value="income">รายรับ</option>
           </select>
+
+          {form.type === 'expense' && subs.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>เลือกจาก Subscription (ถ้ามี)</label>
+              <select style={inputStyle} value={form._subId || ''}
+                onChange={e => {
+                  const sub = subs.find(s => s.id === e.target.value)
+                  if (sub) {
+                    setForm(p => ({ ...p, _subId: sub.id, name: sub.name, amount: String(sub.amount), category: sub.category }))
+                  } else {
+                    setForm(p => ({ ...p, _subId: '', name: '', amount: '', category: 'อาหาร' }))
+                  }
+                }}>
+                <option value="">— พิมพ์เองใหม่ —</option>
+                {subs.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.amount} บาท)</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <label style={labelStyle}>รายการ</label>
           <input style={inputStyle} placeholder="เช่น ค่าอาหาร" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
           <label style={labelStyle}>จำนวนเงิน (บาท)</label>
