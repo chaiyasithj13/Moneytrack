@@ -244,7 +244,13 @@ export default function Dashboard() {
   const saveTxn = async () => {
     if (!form.name || !form.amount) return
     setSaving(true)
-    const image_url = await uploadImage(imgFile, 'txn')
+    // ถ้ามีไฟล์ใหม่ให้ upload, ถ้าเลือกจาก subscription ให้ใช้รูปเดิม
+    let image_url = null
+    if (imgFile) {
+      image_url = await uploadImage(imgFile, 'txn')
+    } else if (imgPreview && !imgPreview.startsWith('blob:')) {
+      image_url = imgPreview
+    }
     const { error } = await supabase.from('transactions').insert({
       user_id: user.id,
       type: form.type,
@@ -681,8 +687,12 @@ export default function Dashboard() {
                   const sub = subs.find(s => s.id === e.target.value)
                   if (sub) {
                     setForm(p => ({ ...p, _subId: sub.id, name: sub.name, amount: String(sub.amount), category: sub.category }))
+                    setImgFile(null)
+                    setImgPreview(sub.image_url || null)
                   } else {
                     setForm(p => ({ ...p, _subId: '', name: '', amount: '', category: 'อาหาร' }))
+                    setImgFile(null)
+                    setImgPreview(null)
                   }
                 }}>
                 <option value="">— พิมพ์เองใหม่ —</option>
