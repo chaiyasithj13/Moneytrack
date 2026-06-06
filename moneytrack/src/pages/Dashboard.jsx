@@ -60,6 +60,88 @@ const labelStyle = { display: 'block', fontSize: 11, fontWeight: 600, color: 'va
 const btnPrimary = { background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }
 const btnSecondary = { background: 'var(--bg3)', border: '1.5px solid var(--border)', color: 'var(--text)', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }
 
+function TransactionsTab({ txns, filterMonth, setFilterMonth, currency, totalSubs, openAddTxn, delTxn, s, fmt }) {
+  const now = new Date()
+  const allMonths = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
+    return { month: d.getMonth(), year: d.getFullYear(), label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}` }
+  }).reverse()
+
+  const filteredTxns = filterMonth
+    ? txns.filter(t => {
+        const d = new Date(t.date)
+        return d.getMonth() === filterMonth.month && d.getFullYear() === filterMonth.year
+      })
+    : txns
+
+  const filtInc = filteredTxns.filter(t => t.type === 'income').reduce((sum, x) => sum + Number(x.amount), 0)
+  const filtExp = filteredTxns.filter(t => t.type === 'expense').reduce((sum, x) => sum + Number(x.amount), 0) + (filterMonth ? 0 : totalSubs)
+
+  const btnStyle = (active) => ({
+    flexShrink: 0, padding: '5px 12px', borderRadius: 20, border: '1.5px solid',
+    borderColor: active ? 'var(--primary)' : 'var(--border)',
+    background: active ? 'var(--primary)' : 'var(--bg3)',
+    color: active ? '#fff' : 'var(--muted)',
+    fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)'
+  })
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, overflowX: 'auto', paddingBottom: 4 }}>
+        <button onClick={() => setFilterMonth(null)} style={btnStyle(!filterMonth)}>ทั้งหมด</button>
+        {allMonths.map((mo, i) => (
+          <button key={i} onClick={() => setFilterMonth(mo)}
+            style={btnStyle(filterMonth && filterMonth.month === mo.month && filterMonth.year === mo.year)}>
+            {mo.label}
+          </button>
+        ))}
+      </div>
+      <div style={s.grid2}>
+        <div style={{ ...s.statBox, borderLeft: '3px solid var(--teal)' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>
+            {filterMonth ? `รายรับ ${filterMonth.label}` : 'รายรับเดือนนี้'}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--teal)' }}>{fmt(filtInc, currency)}</div>
+        </div>
+        <div style={{ ...s.statBox, borderLeft: '3px solid var(--red)' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>
+            {filterMonth ? `รายจ่าย ${filterMonth.label}` : 'รายจ่ายเดือนนี้'}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--red)' }}>{fmt(filtExp, currency)}</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <button style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }} onClick={openAddTxn}>
+          <i className="ti ti-plus" aria-hidden="true" /> เพิ่มรายการ
+        </button>
+      </div>
+      <div style={s.card}>
+        <div style={s.ctitle}>
+          {filterMonth ? `รายการ ${filterMonth.label}` : 'รายการทั้งหมด'}
+          <span style={{ fontWeight: 400, color: 'var(--muted)' }}> ({filteredTxns.length} รายการ)</span>
+        </div>
+        {filteredTxns.length === 0 && (
+          <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: 20 }}>ไม่มีรายการครับ</div>
+        )}
+        {filteredTxns.map((t, i) => (
+          <div key={t.id} style={{ ...s.ir, borderBottom: i === filteredTxns.length - 1 ? 'none' : undefined, paddingBottom: i === filteredTxns.length - 1 ? 0 : undefined }}>
+            <ItemIcon item={{ ...t, color: t.type === 'income' ? '#00b894' : '#e84c4c', icon: t.type === 'income' ? 'ti-arrow-down-left' : 'ti-arrow-up-right' }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={s.iname}>{t.name}</div>
+              <div style={s.isub}><span style={s.tag}>{t.category}</span> &nbsp;{t.date}</div>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: t.type === 'income' ? 'var(--teal)' : 'var(--red)', marginRight: 8 }}>
+              {t.type === 'income' ? '+' : '−'}{fmt(t.amount, currency)}
+            </div>
+            <button style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '2px 6px', borderRadius: 6, flexShrink: 0 }}
+              onClick={() => delTxn(t.id)} aria-label="ลบ"><i className="ti ti-trash" /></button>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
   const [tab, setTab] = useState('dashboard')
@@ -458,70 +540,19 @@ export default function Dashboard() {
             )}
 
             {/* ===== TRANSACTIONS ===== */}
-            {tab === 'transactions' && (() => {
-              const now = new Date()
-              const allMonths = Array.from({ length: 6 }, (_, i) => {
-                const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
-                return { month: d.getMonth(), year: d.getFullYear(), label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}` }
-              }).reverse()
-
-              const filteredTxns = filterMonth
-                ? txns.filter(t => {
-                    const d = new Date(t.date)
-                    return d.getMonth() === filterMonth.month && d.getFullYear() === filterMonth.year
-                  })
-                : txns
-
-              const filtInc = filteredTxns.filter(t => t.type === 'income').reduce((s, x) => s + Number(x.amount), 0)
-              const filtExp = filteredTxns.filter(t => t.type === 'expense').reduce((s, x) => s + Number(x.amount), 0) + (filterMonth ? 0 : totalSubs())
-
-              return (
-              <>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 14, overflowX: 'auto', paddingBottom: 4 }}>
-                  <button onClick={() => setFilterMonth(null)}
-                    style={{ flexShrink: 0, padding: '5px 12px', borderRadius: 20, border: '1.5px solid', borderColor: !filterMonth ? 'var(--primary)' : 'var(--border)', background: !filterMonth ? 'var(--primary)' : 'var(--bg3)', color: !filterMonth ? '#fff' : 'var(--muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                    ทั้งหมด
-                  </button>
-                  {allMonths.map((mo, i) => (
-                    <button key={i} onClick={() => setFilterMonth(mo)}
-                      style={{ flexShrink: 0, padding: '5px 12px', borderRadius: 20, border: '1.5px solid', borderColor: filterMonth && filterMonth.month === mo.month && filterMonth.year === mo.year ? 'var(--primary)' : 'var(--border)', background: filterMonth && filterMonth.month === mo.month && filterMonth.year === mo.year ? 'var(--primary)' : 'var(--bg3)', color: filterMonth && filterMonth.month === mo.month && filterMonth.year === mo.year ? '#fff' : 'var(--muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                      {mo.label}
-                    </button>
-                  ))}
-                </div>
-                <div style={s.grid2}>
-                  <div style={{ ...s.statBox, borderLeft: '3px solid var(--teal)' }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>{filterMonth ? `รายรับ ${filterMonth.label}` : 'รายรับเดือนนี้'}</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--teal)' }}>{fmt(filtInc, currency)}</div>
-                  </div>
-                  <div style={{ ...s.statBox, borderLeft: '3px solid var(--red)' }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>{filterMonth ? `รายจ่าย ${filterMonth.label}` : 'รายจ่ายเดือนนี้'}</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--red)' }}>{fmt(filtExp, currency)}</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-                  <button style={s.addBtn} onClick={openAddTxn}><i className="ti ti-plus" aria-hidden="true" /> เพิ่มรายการ</button>
-                </div>
-                <div style={s.card}>
-                  <div style={s.ctitle}>{filterMonth ? `รายการ ${filterMonth.label}` : 'รายการทั้งหมด'} <span style={{ fontWeight: 400, color: 'var(--muted)' }}>({filteredTxns.length} รายการ)</span></div>
-                  {filteredTxns.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: 20 }}>ไม่มีรายการในเดือนนี้ครับ</div>}
-                  {filteredTxns.map((t, i) => (
-                    <div key={t.id} style={{ ...s.ir, borderBottom: i === filteredTxns.length - 1 ? 'none' : undefined, paddingBottom: i === filteredTxns.length - 1 ? 0 : undefined }}>
-                      <ItemIcon item={{ ...t, color: t.type === 'income' ? '#00b894' : '#e84c4c', icon: t.type === 'income' ? 'ti-arrow-down-left' : 'ti-arrow-up-right' }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={s.iname}>{t.name}</div>
-                        <div style={s.isub}><span style={s.tag}>{t.category}</span> &nbsp;{t.date}</div>
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: t.type === 'income' ? 'var(--teal)' : 'var(--red)', marginRight: 8 }}>
-                        {t.type === 'income' ? '+' : '−'}{fmt(t.amount, currency)}
-                      </div>
-                      <button style={s.delBtn} onClick={() => delTxn(t.id)} aria-label="ลบ"><i className="ti ti-trash" /></button>
-                    </div>
-                  ))}
-                </div>
-              </>
-              )
-            })()}
+            {tab === 'transactions' && (
+              <TransactionsTab
+                txns={txns}
+                filterMonth={filterMonth}
+                setFilterMonth={setFilterMonth}
+                currency={currency}
+                totalSubs={totalSubs}
+                openAddTxn={openAddTxn}
+                delTxn={delTxn}
+                s={s}
+                fmt={fmt}
+              />
+            )}
 
             {/* ===== ALERTS ===== */}
             {tab === 'alerts' && (
