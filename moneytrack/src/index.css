@@ -1,41 +1,119 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* MoneyTrack — "Soft" theme (light + dark).
+   Drop-in replacement for src/index.css.
+   Old token names (--bg2/--bg3/--card/--accent) are aliased to the new Soft
+   tokens so any file not yet restyled keeps working. */
 
 :root {
-  --bg: #f4f5f7;
-  --bg2: #ffffff;
-  --bg3: #eef0f3;
-  --card: #ffffff;
-  --border: #e8eaed;
-  --text: #1a1e2e;
-  --muted: #7a8099;
-  --primary: #1a3c8f;
-  --accent: #00a8e8;
-  --teal: #00b894;
-  --red: #e84c4c;
+  --bg:        #eef3fb;
+  --bg-grad:   radial-gradient(120% 90% at 100% 0%, #e7eefb 0%, #eef3fb 45%, #eaf0f9 100%);
+  --surface:   #ffffff;
+  --surface-2: #f4f7fc;
+  --surface-3: #eaf0f9;
+  --border:    #e6ebf4;
+  --border-2:  #eef1f7;
+  --text:      #1d2438;
+  --muted:     #6b7290;
+  --muted-2:   #9197b0;
+
+  --primary:   #1a3c8f;
+  --primary-2: #3460c8;
+  --on-primary:#ffffff;
+  --grad:      linear-gradient(120deg, #1a3c8f, #3460c8);
+  --grad-hero: linear-gradient(125deg, #1a3c8f 0%, #2c54b4 58%, #00a8e8 130%);
+  --primary-soft: #eaf1fc;
+  --accent:    #00a8e8;
+
+  --teal:  #00b894;
+  --teal-soft: #dcf6ee;
+  --teal-ink:  #0c9b7e;
+  --red:   #e84c4c;
+  --red-soft:  #fdeaea;
+  --red-ink:   #c0392b;
   --amber: #f39c12;
+  --amber-soft:#fef0d6;
+  --amber-ink: #c9821a;
+
+  --radius:    22px;
+  --radius-sm: 16px;
+  --radius-xs: 12px;
+  --shadow:    0 12px 32px -22px rgba(40,60,120,.45);
+  --shadow-lg: 0 24px 60px -28px rgba(28,42,96,.5);
+  --ring:      0 0 0 4px rgba(52,96,200,.15);
+
   --font: 'Figtree', 'Noto Sans Thai', sans-serif;
+
+  /* legacy aliases (resolve to the active theme automatically) */
+  --bg2:  var(--surface);
+  --bg3:  var(--surface-2);
+  --card: var(--surface);
 }
 
 [data-theme="dark"] {
-  --bg: #0d1117;
-  --bg2: #161b25;
-  --bg3: #1e2535;
-  --card: #161b25;
-  --border: #252d3f;
-  --text: #e8edf5;
-  --muted: #6677aa;
-  --primary: #3a6bdf;
+  --bg:        #0e1320;
+  --bg-grad:   radial-gradient(120% 90% at 100% 0%, #16203a 0%, #0e1320 50%, #0c1020 100%);
+  --surface:   #161d2e;
+  --surface-2: #1b2336;
+  --surface-3: #212b42;
+  --border:    #283149;
+  --border-2:  #202840;
+  --text:      #e8edf8;
+  --muted:     #9aa3bf;
+  --muted-2:   #6f7896;
+
+  --primary:   #5680ec;
+  --primary-2: #6f97f2;
+  --grad:      linear-gradient(120deg, #2a52b5, #4f7be8);
+  --grad-hero: linear-gradient(125deg, #1d2c63 0%, #2a52b5 55%, #2f8fd6 130%);
+  --primary-soft: #1f2c4d;
+  --accent:    #00a8e8;
+
+  --teal:  #2fe0b3;
+  --teal-soft: #11342c;
+  --teal-ink:  #46e8bd;
+  --red:   #ff6b6b;
+  --red-soft:  #34202a;
+  --red-ink:   #ff8a8a;
+  --amber: #f7b13d;
+  --amber-soft:#33291a;
+  --amber-ink: #f7c069;
+
+  --shadow:    0 14px 36px -22px rgba(0,0,0,.6);
+  --shadow-lg: 0 26px 64px -28px rgba(0,0,0,.7);
+  --ring:      0 0 0 4px rgba(86,128,236,.22);
 }
 
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; }
 body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
-  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
-
-input, select, button, textarea {
-  font-family: var(--font);
-}
-
+.ti { font-style: normal; line-height: 1; display: inline-flex; }
+input, select, button, textarea { font-family: var(--font); }
 a { text-decoration: none; color: inherit; }
+
+/* interaction helpers */
+.mt-lift { transition: transform .18s cubic-bezier(.2,.7,.3,1), box-shadow .18s, border-color .15s; }
+.mt-lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.mt-nav { transition: background .15s, color .15s; }
+.mt-row { transition: background .15s; border-radius: 14px; }
+.mt-row:hover { background: var(--surface-2); }
+.mt-btn { transition: transform .12s, filter .15s, box-shadow .15s, background .15s; cursor: pointer; }
+.mt-btn:hover { filter: brightness(1.05); }
+.mt-btn:active { transform: scale(.97); }
+.mt-input { transition: border-color .15s, box-shadow .15s, background .15s; }
+.mt-input:focus { border-color: var(--primary) !important; box-shadow: var(--ring); }
+
+.mt-scroll { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.mt-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.mt-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+.mt-scroll::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes mt-spin { to { transform: rotate(360deg); } }
+@keyframes mt-slide-in { from { transform: translateY(12px); } to { transform: none; } }
+
+/* entrance is transform-only (never opacity) so content is always visible */
+.mt-anim { animation: mt-slide-in .4s ease both; }
+@media (prefers-reduced-motion: reduce) { .mt-anim { animation: none; } }
