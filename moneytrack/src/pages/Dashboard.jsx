@@ -2,145 +2,19 @@ import { useState, useEffect, useCallback } from 'react'
 import ProfilePage from './ProfilePage'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
+import {
+  Icon, Avatar, IconBtn, AddButton, Modal, Field, Input, Select, Segmented,
+  CURR, SUB_CATS, TXN_CATS, CAT_META, useIsMobile,
+} from '../components/MoneyUI'
+import { DashboardView, SubscriptionsView, TransactionsView, AlertsView, buildStats } from '../components/DashboardTabs'
 
-const CAT_META = {
-  บันเทิง:  { color: '#7f77dd', icon: 'ti-device-tv' },
-  เพลง:     { color: '#1db954', icon: 'ti-music' },
-  วิดีโอ:   { color: '#e84c4c', icon: 'ti-brand-youtube' },
-  Cloud:    { color: '#378add', icon: 'ti-cloud' },
-  อาหาร:   { color: '#f39c12', icon: 'ti-motorbike' },
-  เดินทาง: { color: '#d4537e', icon: 'ti-car' },
-  ช้อปปิ้ง:{ color: '#639922', icon: 'ti-shopping-cart' },
-  สาธารณูปโภค: { color: '#8888a0', icon: 'ti-bolt' },
-  รายได้:  { color: '#00b894', icon: 'ti-trending-up' },
-  อื่นๆ:   { color: '#aaaaaa', icon: 'ti-star' },
-}
-
-const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
-const CURR = { THB: { sym: '฿', rate: 1 }, USD: { sym: '$', rate: 0.027 }, EUR: { sym: '€', rate: 0.025 } }
-
-function fmt(v, currency) {
-  const c = CURR[currency]
-  const n = v * c.rate
-  if (currency === 'THB') return c.sym + n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return c.sym + n.toFixed(2)
-}
-
-function ItemIcon({ item, size = 40 }) {
-  const meta = CAT_META[item.category] || CAT_META['อื่นๆ']
-  const r = 12
-  if (item.image_url) return (
-    <div style={{ width: size, height: size, borderRadius: r, overflow: 'hidden', flexShrink: 0 }}>
-      <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-    </div>
-  )
-  return (
-    <div style={{ width: size, height: size, borderRadius: r, background: (item.color || meta.color) + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <i className={`ti ${item.icon || meta.icon}`} style={{ color: item.color || meta.color, fontSize: 17 }} aria-hidden="true" />
-    </div>
-  )
-}
-
-function Modal({ title, onClose, children }) {
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg2)', borderRadius: 20, padding: 24, width: '100%', maxWidth: 380, maxHeight: '90vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 20 }}><i className="ti ti-x" /></button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-const inputStyle = { width: '100%', background: 'var(--bg3)', border: '1.5px solid var(--border)', color: 'var(--text)', borderRadius: 10, padding: '9px 12px', fontSize: 14, fontFamily: 'var(--font)', outline: 'none', marginBottom: 12 }
-const labelStyle = { display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.5px' }
-const btnPrimary = { background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }
-const btnSecondary = { background: 'var(--bg3)', border: '1.5px solid var(--border)', color: 'var(--text)', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }
-
-function TransactionsTab({ txns, filterMonth, setFilterMonth, currency, totalSubs, openAddTxn, delTxn, s, fmt }) {
-  const now = new Date()
-  const allMonths = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
-    return { month: d.getMonth(), year: d.getFullYear(), label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}` }
-  }).reverse()
-
-  const filteredTxns = filterMonth
-    ? txns.filter(t => {
-        const d = new Date(t.date)
-        return d.getMonth() === filterMonth.month && d.getFullYear() === filterMonth.year
-      })
-    : txns
-
-  const filtInc = filteredTxns.filter(t => t.type === 'income').reduce((sum, x) => sum + Number(x.amount), 0)
-  const filtExp = filteredTxns.filter(t => t.type === 'expense').reduce((sum, x) => sum + Number(x.amount), 0) + (filterMonth ? 0 : totalSubs)
-
-  const btnStyle = (active) => ({
-    flexShrink: 0, padding: '5px 12px', borderRadius: 20, border: '1.5px solid',
-    borderColor: active ? 'var(--primary)' : 'var(--border)',
-    background: active ? 'var(--primary)' : 'var(--bg3)',
-    color: active ? '#fff' : 'var(--muted)',
-    fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)'
-  })
-
-  return (
-    <>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, overflowX: 'auto', paddingBottom: 4 }}>
-        <button onClick={() => setFilterMonth(null)} style={btnStyle(!filterMonth)}>ทั้งหมด</button>
-        {allMonths.map((mo, i) => (
-          <button key={i} onClick={() => setFilterMonth(mo)}
-            style={btnStyle(filterMonth && filterMonth.month === mo.month && filterMonth.year === mo.year)}>
-            {mo.label}
-          </button>
-        ))}
-      </div>
-      <div style={s.grid2}>
-        <div style={{ ...s.statBox, borderLeft: '3px solid var(--teal)' }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>
-            {filterMonth ? `รายรับ ${filterMonth.label}` : 'รายรับเดือนนี้'}
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--teal)' }}>{fmt(filtInc, currency)}</div>
-        </div>
-        <div style={{ ...s.statBox, borderLeft: '3px solid var(--red)' }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>
-            {filterMonth ? `รายจ่าย ${filterMonth.label}` : 'รายจ่ายเดือนนี้'}
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--red)' }}>{fmt(filtExp, currency)}</div>
-        </div>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <button style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }} onClick={openAddTxn}>
-          <i className="ti ti-plus" aria-hidden="true" /> เพิ่มรายการ
-        </button>
-      </div>
-      <div style={s.card}>
-        <div style={s.ctitle}>
-          {filterMonth ? `รายการ ${filterMonth.label}` : 'รายการทั้งหมด'}
-          <span style={{ fontWeight: 400, color: 'var(--muted)' }}> ({filteredTxns.length} รายการ)</span>
-        </div>
-        {filteredTxns.length === 0 && (
-          <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: 20 }}>ไม่มีรายการครับ</div>
-        )}
-        {filteredTxns.map((t, i) => (
-          <div key={t.id} style={{ ...s.ir, borderBottom: i === filteredTxns.length - 1 ? 'none' : undefined, paddingBottom: i === filteredTxns.length - 1 ? 0 : undefined }}>
-            <ItemIcon item={{ ...t, color: t.type === 'income' ? '#00b894' : '#e84c4c', icon: t.type === 'income' ? 'ti-arrow-down-left' : 'ti-arrow-up-right' }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={s.iname}>{t.name}</div>
-              <div style={s.isub}><span style={s.tag}>{t.category}</span> &nbsp;{t.date}</div>
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: t.type === 'income' ? 'var(--teal)' : 'var(--red)', marginRight: 8 }}>
-              {t.type === 'income' ? '+' : '−'}{fmt(t.amount, currency)}
-            </div>
-            <button style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '2px 6px', borderRadius: 6, flexShrink: 0 }}
-              onClick={() => delTxn(t.id)} aria-label="ลบ"><i className="ti ti-trash" /></button>
-          </div>
-        ))}
-      </div>
-    </>
-  )
-}
+const NAV = [
+  { id: 'dashboard',     icon: 'ti-layout-dashboard', label: 'ภาพรวม',         short: 'ภาพรวม' },
+  { id: 'subscriptions', icon: 'ti-repeat',           label: 'Subscription',   short: 'Sub' },
+  { id: 'transactions',  icon: 'ti-arrows-exchange',  label: 'รายรับ-รายจ่าย', short: 'รายการ' },
+  { id: 'alerts',        icon: 'ti-bell',             label: 'แจ้งเตือน',       short: 'แจ้งเตือน' },
+]
+const TITLES = { dashboard: 'ภาพรวม', subscriptions: 'Subscription', transactions: 'รายรับ-รายจ่าย', alerts: 'แจ้งเตือน' }
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -151,15 +25,13 @@ export default function Dashboard() {
   const [darkMode, setDarkMode] = useState(false)
   const [modal, setModal] = useState(null)
   const [showProfile, setShowProfile] = useState(false)
-  const [selectedMonth, setSelectedMonth] = useState(null)
   const [filterMonth, setFilterMonth] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-
-  // Form state
   const [form, setForm] = useState({})
   const [imgFile, setImgFile] = useState(null)
   const [imgPreview, setImgPreview] = useState(null)
+  const mobile = useIsMobile()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
@@ -169,7 +41,7 @@ export default function Dashboard() {
     setLoading(true)
     const [{ data: s }, { data: t }] = await Promise.all([
       supabase.from('subscriptions').select('*').order('created_at', { ascending: false }),
-      supabase.from('transactions').select('*').order('date', { ascending: false })
+      supabase.from('transactions').select('*').order('date', { ascending: false }),
     ])
     setSubs(s || [])
     setTxns(t || [])
@@ -178,19 +50,21 @@ export default function Dashboard() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Check upcoming subscriptions and notify
+  // notify on upcoming subscriptions
   useEffect(() => {
     if (subs.length === 0) return
     const today = new Date().getDate()
-    const upcoming = subs.filter(s => s.billing_day >= today && s.billing_day <= today + 3)
-    upcoming.forEach(s => {
+    subs.filter(s => s.billing_day >= today && s.billing_day <= today + 3).forEach(s => {
       const diff = s.billing_day - today
-      sendPushNotification(
-        'MoneyTrack — ใกล้ถึงวันตัดบัญชี',
-        `${s.name} จะหักเงิน ${s.amount} บาท ${diff === 0 ? 'วันนี้' : 'ใน ' + diff + ' วัน'}`
-      )
+      sendPushNotification('MoneyTrack — ใกล้ถึงวันตัดบัญชี', `${s.name} จะหักเงิน ${s.amount} บาท ${diff === 0 ? 'วันนี้' : 'ใน ' + diff + ' วัน'}`)
     })
   }, [subs])
+
+  const sendPushNotification = (title, body) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/pwa-192x192.png' })
+    }
+  }
 
   const uploadImage = async (file, folder) => {
     if (!file) return null
@@ -209,518 +83,240 @@ export default function Dashboard() {
     setImgPreview(URL.createObjectURL(file))
   }
 
-  const openAddSub = () => {
-    setForm({ name: '', category: 'บันเทิง', amount: '', billing_day: '1' })
-    setImgFile(null); setImgPreview(null)
-    setModal('add-sub')
-  }
-
+  // ── subscriptions ──
+  const openAddSub = () => { setForm({ name: '', category: 'บันเทิง', amount: '', billing_day: '1' }); setImgFile(null); setImgPreview(null); setModal('add-sub') }
   const saveSub = async () => {
     if (!form.name || !form.amount) return
     setSaving(true)
     const meta = CAT_META[form.category] || CAT_META['อื่นๆ']
     const image_url = await uploadImage(imgFile, 'sub')
     const { error } = await supabase.from('subscriptions').insert({
-      user_id: user.id,
-      name: form.name,
-      category: form.category,
-      amount: parseFloat(form.amount),
-      billing_day: parseInt(form.billing_day) || 1,
-      color: meta.color,
-      icon: meta.icon,
-      image_url,
+      user_id: user.id, name: form.name, category: form.category,
+      amount: parseFloat(form.amount), billing_day: parseInt(form.billing_day) || 1,
+      color: meta.color, icon: meta.icon, image_url,
     })
     if (!error) { await loadData(); setModal(null) }
     setSaving(false)
   }
-
-  const openAddTxn = () => {
-    const today = new Date().toISOString().split('T')[0]
-    setForm({ type: 'expense', name: '', amount: '', category: 'อาหาร', date: today })
-    setImgFile(null); setImgPreview(null)
-    setModal('add-txn')
+  const openEditSub = (sub) => {
+    setForm({ _editId: sub.id, name: sub.name, category: sub.category, amount: String(sub.amount), billing_day: String(sub.billing_day) })
+    setImgFile(null); setImgPreview(sub.image_url || null); setModal('edit-sub')
   }
-
-  const saveTxn = async () => {
+  const updateSub = async () => {
     if (!form.name || !form.amount) return
     setSaving(true)
-    // ถ้ามีไฟล์ใหม่ให้ upload, ถ้าเลือกจาก subscription ให้ใช้รูปเดิม
-    let image_url = null
-    if (imgFile) {
-      image_url = await uploadImage(imgFile, 'txn')
-    } else if (imgPreview && !imgPreview.startsWith('blob:')) {
-      image_url = imgPreview
-    }
-    const { error } = await supabase.from('transactions').insert({
-      user_id: user.id,
-      type: form.type,
-      name: form.name,
-      amount: parseFloat(form.amount),
-      category: form.category,
-      date: form.date,
-      image_url,
-    })
+    const meta = CAT_META[form.category] || CAT_META['อื่นๆ']
+    const image_url = imgPreview && imgPreview.startsWith('blob:') ? await uploadImage(imgFile, 'sub') : (imgPreview || null)
+    const { error } = await supabase.from('subscriptions').update({
+      name: form.name, category: form.category, amount: parseFloat(form.amount),
+      billing_day: parseInt(form.billing_day) || 1, color: meta.color, icon: meta.icon, image_url,
+    }).eq('id', form._editId)
     if (!error) { await loadData(); setModal(null) }
     setSaving(false)
   }
-
   const delSub = async (id) => {
     await supabase.from('subscriptions').delete().eq('id', id)
     setSubs(prev => prev.filter(s => s.id !== id))
   }
 
-  const openEditSub = (sub) => {
-    setForm({ _editId: sub.id, name: sub.name, category: sub.category, amount: String(sub.amount), billing_day: String(sub.billing_day) })
-    setImgFile(null)
-    setImgPreview(sub.image_url || null)
-    setModal('edit-sub')
+  // ── transactions ──
+  const openAddTxn = () => {
+    const today = new Date().toISOString().split('T')[0]
+    setForm({ type: 'expense', name: '', amount: '', category: 'อาหาร', date: today })
+    setImgFile(null); setImgPreview(null); setModal('add-txn')
   }
-
-  const updateSub = async () => {
+  const saveTxn = async () => {
     if (!form.name || !form.amount) return
     setSaving(true)
+    let image_url = null
+    if (imgFile) image_url = await uploadImage(imgFile, 'txn')
+    else if (imgPreview && !imgPreview.startsWith('blob:')) image_url = imgPreview
     const meta = CAT_META[form.category] || CAT_META['อื่นๆ']
-    let image_url = imgPreview && imgPreview.startsWith('blob:') ? await uploadImage(imgFile, 'sub') : (imgPreview || null)
-    const { error } = await supabase.from('subscriptions').update({
-      name: form.name,
-      category: form.category,
-      amount: parseFloat(form.amount),
-      billing_day: parseInt(form.billing_day) || 1,
-      color: meta.color,
-      icon: meta.icon,
-      image_url,
-    }).eq('id', form._editId)
+    const { error } = await supabase.from('transactions').insert({
+      user_id: user.id, type: form.type, name: form.name, amount: parseFloat(form.amount),
+      category: form.category, date: form.date, icon: meta.icon, image_url,
+    })
     if (!error) { await loadData(); setModal(null) }
     setSaving(false)
   }
-
   const delTxn = async (id) => {
     await supabase.from('transactions').delete().eq('id', id)
     setTxns(prev => prev.filter(t => t.id !== id))
   }
 
-  // Push notification helper
-  const sendPushNotification = (title, body) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body, icon: '/pwa-192x192.png' })
-    }
-  }
-
   const signOut = () => supabase.auth.signOut()
-
+  const setField = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  const goTab = (t) => { setTab(t); setShowProfile(false) }
   const totalSubs = subs.reduce((s, x) => s + Number(x.amount), 0)
-  const totalInc = txns.filter(t => t.type === 'income').reduce((s, x) => s + Number(x.amount), 0)
-  const totalExp = txns.filter(t => t.type === 'expense').reduce((s, x) => s + Number(x.amount), 0) + totalSubs
-  const balance = totalInc - totalExp
-
-  const today = new Date().getDate()
-  const upcoming = subs.filter(s => s.billing_day >= today && s.billing_day <= today + 7)
-
-  const catMap = {}
-  subs.forEach(s => { catMap[s.category] = (catMap[s.category] || 0) + Number(s.amount) })
-  txns.filter(t => t.type === 'expense').forEach(t => { catMap[t.category] = (catMap[t.category] || 0) + Number(t.amount) })
-  const totalCat = Object.values(catMap).reduce((a, b) => a + b, 0)
-
-  const thisMonth = new Date().getMonth()
-  const mockInc = [28000, 31000, 29000, 33000, 35000, 38500, 36000, 40000, 38000, 42000, 39000, totalInc]
-  const mockExp = [22000, 25000, 21000, 27000, 30000, 28000, 26000, 31000, 29000, 33000, 30000, totalExp]
-  const chartMonths = Array.from({ length: 6 }, (_, i) => (thisMonth - 5 + i + 12) % 12)
-  const chartInc = chartMonths.map(m => mockInc[m])
-  const chartExp = chartMonths.map(m => mockExp[m])
-  const maxV = Math.max(...chartInc, ...chartExp, 1)
-
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'คุณ'
-
-  const NAV = [
-    { id: 'dashboard', icon: 'ti-layout-dashboard', label: 'Dashboard' },
-    { id: 'subscriptions', icon: 'ti-refresh', label: 'Subscription' },
-    { id: 'transactions', icon: 'ti-list', label: 'รายรับ-รายจ่าย' },
-    { id: 'alerts', icon: 'ti-bell', label: 'แจ้งเตือน' },
-  ]
-
-  const s = {
-    wrap: { minHeight: '100vh', background: 'var(--bg)' },
-    topbar: { background: 'var(--primary)', padding: '13px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-    logo: { fontSize: 18, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 },
-    nav: { display: 'flex', background: 'var(--bg2)', borderBottom: '1px solid var(--border)', padding: '0 20px', overflowX: 'auto' },
-    nb: { padding: '11px 14px', border: 'none', background: 'none', color: 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderBottom: '2.5px solid transparent', fontFamily: 'var(--font)', whiteSpace: 'nowrap' },
-    nbActive: { color: 'var(--primary)', borderBottom: '2.5px solid var(--primary)' },
-    content: { padding: 20, maxWidth: 900, margin: '0 auto' },
-    grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 },
-    card: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 },
-    sumCard: { background: 'var(--primary)', borderRadius: 16, padding: 20, marginBottom: 16, color: '#fff' },
-    ctitle: { fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '.8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-    ir: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' },
-    iname: { fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-    isub: { fontSize: 12, color: 'var(--muted)', marginTop: 2 },
-    tag: { fontSize: 10, background: 'var(--bg3)', borderRadius: 20, padding: '2px 8px', color: 'var(--muted)', fontWeight: 500 },
-    addBtn: { ...btnPrimary, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 },
-    delBtn: { background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '2px 6px', borderRadius: 6, flexShrink: 0 },
-    statBox: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '13px 15px' },
-  }
-
-  const imgUploadBlock = (
-    <div style={{ marginBottom: 12 }}>
-      <label style={labelStyle}>รูปภาพ (ไม่บังคับ)</label>
-      <div onClick={() => document.getElementById('img-input').click()}
-        style={{ border: `2px dashed ${imgPreview ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 12, padding: 16, textAlign: 'center', cursor: 'pointer', background: 'var(--bg3)' }}>
-        {imgPreview
-          ? <img src={imgPreview} alt="preview" style={{ width: 64, height: 64, borderRadius: 10, objectFit: 'cover', margin: '0 auto' }} />
-          : <><i className="ti ti-photo-plus" style={{ fontSize: 28, color: 'var(--muted)' }} /><div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>แตะเพื่ออัปโหลดรูป</div></>
-        }
-      </div>
-      <input id="img-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImgChange} />
-    </div>
-  )
+  const displayName = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'คุณ'
+  const initial = (displayName || 'U').charAt(0).toUpperCase()
 
   if (showProfile) return <ProfilePage onBack={() => setShowProfile(false)} darkMode={darkMode} setDarkMode={setDarkMode} />
 
+  // ── shared chrome ──
+  const CurrencySelect = (
+    <div style={{ position: 'relative' }}>
+      <select value={currency} onChange={e => setCurrency(e.target.value)} className="mt-input"
+        style={{ appearance: 'none', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 12, padding: '0 32px 0 14px', height: 44, minWidth: 96, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', boxShadow: 'var(--shadow)' }}>
+        {Object.keys(CURR).map(k => <option key={k} value={k}>{CURR[k].sym} {k}</option>)}
+      </select>
+      <Icon n="ti-chevron-down" s={14} style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
+    </div>
+  )
+
+  const content = loading ? (
+    <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
+      <div style={{ width: 34, height: 34, border: '3px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'mt-spin .8s linear infinite' }} />
+    </div>
+  ) : tab === 'dashboard' ? <DashboardView subs={subs} txns={txns} currency={currency} mobile={mobile} goTab={goTab} />
+    : tab === 'subscriptions' ? <SubscriptionsView subs={subs} currency={currency} mobile={mobile} openAddSub={openAddSub} openEditSub={openEditSub} delSub={delSub} />
+    : tab === 'transactions' ? <TransactionsView txns={txns} currency={currency} mobile={mobile} filterMonth={filterMonth} setFilterMonth={setFilterMonth} openAddTxn={openAddTxn} delTxn={delTxn} totalSubs={totalSubs} />
+    : <AlertsView subs={subs} txns={txns} currency={currency} mobile={mobile} />
+
   return (
-    <div style={s.wrap}>
-      {/* Topbar */}
-      <div style={s.topbar}>
-        <div style={s.logo}><div style={{ width: 8, height: 8, background: '#00a8e8', borderRadius: '50%' }} />MoneyTrack</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <select value={currency} onChange={e => setCurrency(e.target.value)}
-            style={{ background: 'rgba(255,255,255,.15)', border: '1px solid rgba(255,255,255,.2)', color: '#fff', borderRadius: 8, padding: '5px 8px', fontSize: 13, fontFamily: 'var(--font)', cursor: 'pointer' }}>
-            <option value="THB">฿ บาท</option>
-            <option value="USD">$ USD</option>
-            <option value="EUR">€ EUR</option>
-          </select>
-          <button onClick={() => setDarkMode(p => !p)} style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 15 }}>
-            <i className={`ti ${darkMode ? 'ti-sun' : 'ti-moon'}`} />
-          </button>
-          <button onClick={() => setShowProfile(true)} style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 15 }}><i className="ti ti-user-circle" aria-hidden="true" /></button>
-          <button onClick={signOut} style={{ background: 'rgba(255,255,255,.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 13, fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <i className="ti ti-logout" aria-hidden="true" /><span style={{ display: 'none' }}>ออกจากระบบ</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Nav */}
-      <div style={s.nav}>
-        {NAV.map(n => (
-          <button key={n.id} style={{ ...s.nb, ...(tab === n.id ? s.nbActive : {}) }} onClick={() => setTab(n.id)}>
-            <i className={`ti ${n.icon}`} aria-hidden="true" /> {n.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={s.content}>
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 60 }}>
-            <div style={{ width: 32, height: 32, border: '3px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: mobile ? 'column' : 'row', background: 'var(--bg-grad)' }}>
+      {/* Sidebar (desktop) */}
+      {!mobile && (
+        <aside style={{ width: 232, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '22px 14px', position: 'sticky', top: 0, height: '100vh' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 10px 22px', fontSize: 18, fontWeight: 800 }}>
+            <span style={{ width: 30, height: 30, borderRadius: 10, background: 'var(--grad)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}><Icon n="ti-wallet" s={17} /></span>MoneyTrack
           </div>
-        ) : (
-          <>
-            {/* ===== DASHBOARD ===== */}
-            {tab === 'dashboard' && (
-              <>
-                <div style={s.sumCard}>
-                  <div style={{ fontSize: 11, opacity: .7, textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: 4 }}>สวัสดี {displayName} — ยอดคงเหลือเดือนนี้</div>
-                  <div style={{ fontSize: 30, fontWeight: 700, color: balance >= 0 ? '#7fffda' : '#ffaaaa' }}>{fmt(balance, currency)}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
-                    <div style={{ background: 'rgba(255,255,255,.12)', borderRadius: 10, padding: 12 }}>
-                      <div style={{ fontSize: 10, opacity: .7, marginBottom: 3 }}>↓ รายรับ</div>
-                      <div style={{ fontSize: 17, fontWeight: 700 }}>{fmt(totalInc, currency)}</div>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,.12)', borderRadius: 10, padding: 12 }}>
-                      <div style={{ fontSize: 10, opacity: .7, marginBottom: 3 }}>↑ รายจ่าย</div>
-                      <div style={{ fontSize: 17, fontWeight: 700 }}>{fmt(totalExp, currency)}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={s.grid2}>
-                  <div style={s.card}>
-                    <div style={s.ctitle}>
-                      รายรับ-รายจ่าย 6 เดือน
-                      <span style={{ display: 'flex', gap: 8, fontWeight: 400 }}>
-                        <span style={{ fontSize: 10, color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 3, background: 'var(--teal)', display: 'inline-block', borderRadius: 2 }} />รับ</span>
-                        <span style={{ fontSize: 10, color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 3, background: 'var(--red)', display: 'inline-block', borderRadius: 2 }} />จ่าย</span>
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 100 }}>
-                      {chartMonths.map((m, i) => (
-                        <div key={i} onClick={() => setSelectedMonth({ monthIdx: m, monthName: MONTHS[m], inc: chartInc[i], exp: chartExp[i] })}
-                          style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', gap: 2 }}>
-                          <div style={{ width: '100%', display: 'flex', alignItems: 'flex-end', gap: 1, height: 82 }}>
-                            <div style={{ width: '50%', height: Math.round((chartInc[i] / maxV) * 82), background: 'var(--teal)', borderRadius: '4px 4px 0 0', minHeight: 3, transition: '.2s', opacity: selectedMonth && selectedMonth.monthIdx === m ? 1 : 0.75 }} />
-                            <div style={{ width: '50%', height: Math.round((chartExp[i] / maxV) * 82), background: 'var(--red)', borderRadius: '4px 4px 0 0', minHeight: 3, transition: '.2s', opacity: selectedMonth && selectedMonth.monthIdx === m ? 1 : 0.75 }} />
-                          </div>
-                          <div style={{ fontSize: 10, color: selectedMonth && selectedMonth.monthIdx === m ? 'var(--primary)' : 'var(--muted)', fontWeight: selectedMonth && selectedMonth.monthIdx === m ? 700 : 400 }}>{MONTHS[m]}</div>
-                        </div>
-                      ))}
-                    </div>
-                    {selectedMonth && (
-                      <div style={{ marginTop: 10, background: 'var(--bg3)', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{selectedMonth.monthName} {new Date().getFullYear()}</div>
-                          <div style={{ display: 'flex', gap: 16 }}>
-                            <div><div style={{ fontSize: 10, color: 'var(--muted)' }}>รายรับ</div><div style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal)' }}>{fmt(selectedMonth.inc, currency)}</div></div>
-                            <div><div style={{ fontSize: 10, color: 'var(--muted)' }}>รายจ่าย</div><div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)' }}>{fmt(selectedMonth.exp, currency)}</div></div>
-                            <div><div style={{ fontSize: 10, color: 'var(--muted)' }}>คงเหลือ</div><div style={{ fontSize: 13, fontWeight: 700, color: selectedMonth.inc - selectedMonth.exp >= 0 ? 'var(--teal)' : 'var(--red)' }}>{fmt(selectedMonth.inc - selectedMonth.exp, currency)}</div></div>
-                          </div>
-                        </div>
-                        <button onClick={() => { setSelectedMonth(null); setTab('transactions') }} style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>ดูรายการ →</button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={s.card}>
-                    <div style={s.ctitle}>สัดส่วนค่าใช้จ่าย</div>
-                    {Object.keys(catMap).slice(0, 5).map(k => {
-                      const pct = Math.round((catMap[k] / totalCat) * 100)
-                      const col = CAT_META[k]?.color || '#888'
-                      return (
-                        <div key={k} style={{ marginBottom: 10 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>
-                            <span>{k}</span><span style={{ color: 'var(--muted)' }}>{fmt(catMap[k], currency)} <span style={{ opacity: .6 }}>{pct}%</span></span>
-                          </div>
-                          <div style={{ background: 'var(--bg3)', borderRadius: 4, height: 6 }}>
-                            <div style={{ width: `${pct}%`, height: 6, borderRadius: 4, background: col }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {Object.keys(catMap).length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>ยังไม่มีรายจ่ายครับ</div>}
-                  </div>
-                </div>
-
-                <div style={s.grid2}>
-                  <div style={s.card}>
-                    <div style={s.ctitle}>Subscription ที่จะถึง</div>
-                    {upcoming.length === 0
-                      ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>ไม่มีใน 7 วันข้างหน้าครับ</div>
-                      : upcoming.map(s2 => (
-                        <div key={s2.id} style={{ ...s.ir, borderBottom: 'none', paddingBottom: 0 }}>
-                          <ItemIcon item={s2} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={s.iname}>{s2.name}</div>
-                            <div style={s.isub}>วันที่ {s2.billing_day}</div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)' }}>{fmt(s2.amount, currency)}</div>
-                            <span style={{ fontSize: 10, background: '#fff3cd', color: '#856404', padding: '2px 7px', borderRadius: 20, fontWeight: 600 }}>ใกล้ถึง</span>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-
-                  <div style={s.card}>
-                    <div style={s.ctitle}>รายการล่าสุด</div>
-                    {txns.slice(0, 4).map(t => (
-                      <div key={t.id} style={{ ...s.ir, borderBottom: 'none', paddingBottom: 0 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 10, background: t.type === 'income' ? '#0d291822' : '#2a0e0e22', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <i className={`ti ${t.type === 'income' ? 'ti-arrow-down-left' : 'ti-arrow-up-right'}`} style={{ color: t.type === 'income' ? 'var(--teal)' : 'var(--red)', fontSize: 15 }} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={s.iname}>{t.name}</div>
-                          <div style={s.isub}>{t.date}</div>
-                        </div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: t.type === 'income' ? 'var(--teal)' : 'var(--red)' }}>
-                          {t.type === 'income' ? '+' : '−'}{fmt(t.amount, currency)}
-                        </div>
-                      </div>
-                    ))}
-                    {txns.length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>ยังไม่มีรายการครับ</div>}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* ===== SUBSCRIPTIONS ===== */}
-            {tab === 'subscriptions' && (
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
-                  {[
-                    { label: 'รวม/เดือน', val: fmt(totalSubs, currency), color: 'var(--primary)' },
-                    { label: 'จำนวน', val: `${subs.length} รายการ`, color: 'var(--text)' },
-                    { label: 'ใกล้ถึง', val: `${upcoming.length} รายการ`, color: 'var(--amber)' },
-                  ].map(x => (
-                    <div key={x.label} style={s.statBox}>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>{x.label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: x.color }}>{x.val}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-                  <button style={s.addBtn} onClick={openAddSub}><i className="ti ti-plus" aria-hidden="true" /> เพิ่ม Subscription</button>
-                </div>
-                <div style={s.card}>
-                  {subs.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: 20 }}>ยังไม่มี subscription ครับ กด + เพื่อเพิ่มเลย</div>}
-                  {subs.map((sub, i) => (
-                    <div key={sub.id} style={{ ...s.ir, borderBottom: i === subs.length - 1 ? 'none' : undefined, paddingBottom: i === subs.length - 1 ? 0 : undefined }}>
-                      <ItemIcon item={sub} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={s.iname}>{sub.name}</div>
-                        <div style={s.isub}><span style={s.tag}>{sub.category}</span> &nbsp;วันที่ {sub.billing_day}</div>
-                      </div>
-                      <div style={{ textAlign: 'right', marginRight: 8 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)' }}>{fmt(sub.amount, currency)}/เดือน</div>
-                        <span style={{ fontSize: 10, ...(sub.billing_day <= today + 7 ? { background: '#fff3cd', color: '#856404' } : { background: '#d1f2eb', color: '#0b6e4f' }), padding: '2px 7px', borderRadius: 20, fontWeight: 600 }}>
-                          {sub.billing_day >= today && sub.billing_day <= today + 7 ? 'เร็วๆนี้' : 'ปกติ'}
-                        </span>
-                      </div>
-                      <button style={{ ...s.delBtn, color: 'var(--primary)' }} onClick={() => openEditSub(sub)} aria-label="แก้ไข"><i className="ti ti-edit" /></button>
-                      <button style={s.delBtn} onClick={() => delSub(sub.id)} aria-label="ลบ"><i className="ti ti-trash" /></button>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* ===== TRANSACTIONS ===== */}
-            {tab === 'transactions' && (
-              <TransactionsTab
-                txns={txns}
-                filterMonth={filterMonth}
-                setFilterMonth={setFilterMonth}
-                currency={currency}
-                totalSubs={totalSubs}
-                openAddTxn={openAddTxn}
-                delTxn={delTxn}
-                s={s}
-                fmt={fmt}
-              />
-            )}
-
-            {/* ===== ALERTS ===== */}
-            {tab === 'alerts' && (
-              <>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>การแจ้งเตือน</div>
-                {subs.filter(s2 => s2.billing_day >= today && s2.billing_day <= today + 7).map(s2 => {
-                  const diff = s2.billing_day - today
-                  return (
-                    <div key={s2.id} style={{ background: 'var(--bg2)', border: '1.5px solid var(--border)', borderRadius: 12, padding: '11px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: diff <= 1 ? 'var(--red)' : 'var(--amber)', flexShrink: 0 }} />
-                      <div style={{ fontSize: 13 }}><b>{s2.name}</b> จะหักเงิน {fmt(s2.amount, currency)} {diff === 0 ? 'วันนี้' : `ใน ${diff} วัน`}</div>
-                    </div>
-                  )
-                })}
-                <div style={{ background: 'var(--bg2)', border: '1.5px solid var(--border)', borderRadius: 12, padding: '11px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: balance >= 0 ? 'var(--teal)' : 'var(--red)', flexShrink: 0 }} />
-                  <div style={{ fontSize: 13 }}>{balance >= 0 ? `ยอดคงเหลือเดือนนี้ ${fmt(balance, currency)} — อยู่ในเกณฑ์ดี` : `รายจ่ายเกินรายรับ ${fmt(Math.abs(balance), currency)} เดือนนี้`}</div>
-                </div>
-                <div style={{ ...s.card, marginTop: 16 }}>
-                  <div style={s.ctitle}>สรุป Subscription รายเดือน</div>
-                  {subs.map((sub, i) => (
-                    <div key={sub.id} style={{ ...s.ir, borderBottom: i === subs.length - 1 ? 'none' : undefined, paddingBottom: i === subs.length - 1 ? 0 : undefined }}>
-                      <ItemIcon item={sub} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={s.iname}>{sub.name}</div>
-                        <div style={s.isub}>หักวันที่ {sub.billing_day} ทุกเดือน</div>
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)' }}>{fmt(sub.amount, currency)}</div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* ===== MODAL: Add Subscription ===== */}
-      {modal === 'add-sub' && (
-        <Modal title="เพิ่ม Subscription" onClose={() => setModal(null)}>
-          {imgUploadBlock}
-          <label style={labelStyle}>ชื่อบริการ</label>
-          <input style={inputStyle} placeholder="เช่น Disney+" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-          <label style={labelStyle}>หมวดหมู่</label>
-          <select style={inputStyle} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
-            {Object.keys(CAT_META).filter(k => k !== 'รายได้').map(k => <option key={k}>{k}</option>)}
-          </select>
-          <label style={labelStyle}>ราคา (บาท/เดือน)</label>
-          <input style={inputStyle} type="number" placeholder="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
-          <label style={labelStyle}>วันตัดบัญชี (1-31)</label>
-          <input style={inputStyle} type="number" min="1" max="31" placeholder="1" value={form.billing_day} onChange={e => setForm(p => ({ ...p, billing_day: e.target.value }))} />
-          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-            <button style={btnSecondary} onClick={() => setModal(null)}>ยกเลิก</button>
-            <button style={{ ...btnPrimary, flex: 1, opacity: saving ? .7 : 1 }} onClick={saveSub} disabled={saving}>
-              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {modal === 'edit-sub' && (
-        <Modal title="แก้ไข Subscription" onClose={() => setModal(null)}>
-          {imgUploadBlock}
-          <label style={labelStyle}>ชื่อบริการ</label>
-          <input style={inputStyle} placeholder="เช่น Disney+" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-          <label style={labelStyle}>หมวดหมู่</label>
-          <select style={inputStyle} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
-            {Object.keys(CAT_META).filter(k => k !== 'รายได้').map(k => <option key={k}>{k}</option>)}
-          </select>
-          <label style={labelStyle}>ราคา (บาท/เดือน)</label>
-          <input style={inputStyle} type="number" placeholder="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
-          <label style={labelStyle}>วันตัดบัญชี (1-31)</label>
-          <input style={inputStyle} type="number" min="1" max="31" placeholder="1" value={form.billing_day} onChange={e => setForm(p => ({ ...p, billing_day: e.target.value }))} />
-          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-            <button style={btnSecondary} onClick={() => setModal(null)}>ยกเลิก</button>
-            <button style={{ ...btnPrimary, flex: 1, opacity: saving ? .7 : 1 }} onClick={updateSub} disabled={saving}>
-              {saving ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {/* ===== MODAL: Add Transaction ===== */}
-      {modal === 'add-txn' && (
-        <Modal title="เพิ่มรายรับ / รายจ่าย" onClose={() => setModal(null)}>
-          {imgUploadBlock}
-          <label style={labelStyle}>ประเภท</label>
-          <select style={inputStyle} value={form.type} onChange={e => {
-            setForm(p => ({ ...p, type: e.target.value, name: '', amount: '', category: 'อาหาร' }))
-          }}>
-            <option value="expense">รายจ่าย</option>
-            <option value="income">รายรับ</option>
-          </select>
-
-          {form.type === 'expense' && subs.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <label style={labelStyle}>เลือกจาก Subscription (ถ้ามี)</label>
-              <select style={inputStyle} value={form._subId || ''}
-                onChange={e => {
-                  const sub = subs.find(s => s.id === e.target.value)
-                  if (sub) {
-                    setForm(p => ({ ...p, _subId: sub.id, name: sub.name, amount: String(sub.amount), category: sub.category }))
-                    setImgFile(null)
-                    setImgPreview(sub.image_url || null)
-                  } else {
-                    setForm(p => ({ ...p, _subId: '', name: '', amount: '', category: 'อาหาร' }))
-                    setImgFile(null)
-                    setImgPreview(null)
-                  }
-                }}>
-                <option value="">— พิมพ์เองใหม่ —</option>
-                {subs.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.amount} บาท)</option>
-                ))}
-              </select>
+          <nav style={{ flex: 1 }}>
+            {NAV.map(n => {
+              const active = tab === n.id
+              return (
+                <button key={n.id} onClick={() => goTab(n.id)} className="mt-nav mt-btn" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 15, fontSize: 14, fontWeight: active ? 700 : 600, fontFamily: 'inherit', cursor: 'pointer', border: 'none', textAlign: 'left', color: active ? '#fff' : 'var(--muted)', background: active ? 'var(--grad)' : 'transparent', boxShadow: active ? '0 10px 20px -10px rgba(26,60,143,.7)' : 'none', marginBottom: 5 }}>
+                  <Icon n={n.icon} s={19} />{n.label}
+                </button>
+              )
+            })}
+          </nav>
+          <button onClick={() => setShowProfile(true)} className="mt-btn" style={{ display: 'flex', alignItems: 'center', gap: 11, padding: 12, borderRadius: 16, background: 'var(--surface-2)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', width: '100%' }}>
+            <Avatar initial={initial} size={40} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</div>
             </div>
-          )}
+            <Icon n="ti-settings" s={18} style={{ color: 'var(--muted-2)' }} />
+          </button>
+        </aside>
+      )}
 
-          <label style={labelStyle}>รายการ</label>
-          <input style={inputStyle} placeholder="เช่น ค่าอาหาร" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-          <label style={labelStyle}>จำนวนเงิน (บาท)</label>
-          <input style={inputStyle} type="number" placeholder="0" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
-          <label style={labelStyle}>หมวดหมู่</label>
-          <select style={inputStyle} value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
-            {Object.keys(CAT_META).map(k => <option key={k}>{k}</option>)}
-          </select>
-          <label style={labelStyle}>วันที่</label>
-          <input style={inputStyle} type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
-          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-            <button style={btnSecondary} onClick={() => setModal(null)}>ยกเลิก</button>
-            <button style={{ ...btnPrimary, flex: 1, opacity: saving ? .7 : 1 }} onClick={saveTxn} disabled={saving}>
-              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-            </button>
+      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
+        {mobile ? (
+          <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', gap: 10, position: 'sticky', top: 0, zIndex: 20, background: 'var(--bg)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 17, fontWeight: 800 }}>
+              <span style={{ width: 30, height: 30, borderRadius: 10, background: 'var(--grad)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}><Icon n="ti-wallet" s={16} /></span>MoneyTrack
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {CurrencySelect}
+              <IconBtn n={darkMode ? 'ti-sun' : 'ti-moon'} onClick={() => setDarkMode(p => !p)} />
+              <button onClick={() => setShowProfile(true)} className="mt-btn" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}><Avatar initial={initial} size={44} /></button>
+            </div>
+          </header>
+        ) : (
+          <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 30px 6px', gap: 16 }}>
+            <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+              <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab === 'dashboard' ? `สวัสดี, ${displayName} ☀️` : TITLES[tab]}</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{new Date().toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              {CurrencySelect}
+              <IconBtn n={darkMode ? 'ti-sun' : 'ti-moon'} onClick={() => setDarkMode(p => !p)} />
+              <IconBtn n="ti-bell" dot onClick={() => goTab('alerts')} active={tab === 'alerts'} />
+              <AddButton onClick={openAddTxn}>เพิ่มรายการ</AddButton>
+            </div>
+          </header>
+        )}
+
+        <div style={{ flex: 1, padding: mobile ? '6px 16px 96px' : '6px 30px 30px' }}>
+          <div style={{ maxWidth: 1060, margin: '0 auto' }}>{content}</div>
+        </div>
+      </main>
+
+      {/* Bottom nav (mobile) */}
+      {mobile && (
+        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 30, display: 'flex', alignItems: 'center', justifyContent: 'space-around', background: 'var(--surface)', borderTop: '1px solid var(--border)', padding: '8px 6px 10px' }}>
+          {NAV.slice(0, 2).map(n => <NavBtn key={n.id} n={n} active={tab === n.id} onClick={() => goTab(n.id)} />)}
+          <button onClick={openAddTxn} className="mt-btn" style={{ width: 54, height: 54, borderRadius: 18, background: 'var(--grad)', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 12px 24px -8px rgba(26,60,143,.8)', marginTop: -22, flexShrink: 0 }}><Icon n="ti-plus" s={26} /></button>
+          {NAV.slice(2).map(n => <NavBtn key={n.id} n={n} active={tab === n.id} onClick={() => goTab(n.id)} />)}
+        </nav>
+      )}
+
+      {/* Modals */}
+      {(modal === 'add-sub' || modal === 'edit-sub') && (
+        <Modal title={modal === 'edit-sub' ? 'แก้ไข Subscription' : 'เพิ่ม Subscription'} subtitle="บริการรายเดือนที่ตัดเงินอัตโนมัติ" onClose={() => setModal(null)} mobile={mobile}>
+          <ImgBlock imgPreview={imgPreview} onChange={handleImgChange} />
+          <Field label="ชื่อบริการ"><Input placeholder="เช่น Disney+" value={form.name || ''} onChange={e => setField('name', e.target.value)} /></Field>
+          <Field label="หมวดหมู่"><Select value={form.category || 'บันเทิง'} onChange={e => setField('category', e.target.value)}>{SUB_CATS.map(k => <option key={k}>{k}</option>)}</Select></Field>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}><Field label="ราคา (บาท/เดือน)"><Input type="number" placeholder="0" value={form.amount || ''} onChange={e => setField('amount', e.target.value)} /></Field></div>
+            <div style={{ width: 130 }}><Field label="วันตัดบัญชี"><Input type="number" min="1" max="31" placeholder="1" value={form.billing_day || ''} onChange={e => setField('billing_day', e.target.value)} /></Field></div>
           </div>
+          <ModalButtons onClose={() => setModal(null)} onSave={modal === 'edit-sub' ? updateSub : saveSub} label={modal === 'edit-sub' ? 'บันทึกการแก้ไข' : 'บันทึก'} saving={saving} />
         </Modal>
       )}
+
+      {modal === 'add-txn' && (
+        <Modal title="เพิ่มรายการ" subtitle="บันทึกรายรับหรือรายจ่าย" onClose={() => setModal(null)} mobile={mobile}>
+          <Field label="ประเภท">
+            <Segmented value={form.type || 'expense'} onChange={v => setForm(p => ({ ...p, type: v, category: v === 'income' ? 'รายได้' : 'อาหาร' }))}
+              options={[{ value: 'expense', label: 'รายจ่าย', icon: 'ti-arrow-up-right' }, { value: 'income', label: 'รายรับ', icon: 'ti-arrow-down-left' }]} />
+          </Field>
+          <ImgBlock imgPreview={imgPreview} onChange={handleImgChange} />
+          {form.type !== 'income' && subs.length > 0 && (
+            <Field label="เลือกจาก Subscription (ถ้ามี)">
+              <Select value={form._subId || ''} onChange={e => {
+                const sub = subs.find(s => s.id === e.target.value)
+                if (sub) { setForm(p => ({ ...p, _subId: sub.id, name: sub.name, amount: String(sub.amount), category: sub.category })); setImgFile(null); setImgPreview(sub.image_url || null) }
+                else { setForm(p => ({ ...p, _subId: '', name: '', amount: '', category: 'อาหาร' })); setImgFile(null); setImgPreview(null) }
+              }}>
+                <option value="">— พิมพ์เองใหม่ —</option>
+                {subs.map(s => <option key={s.id} value={s.id}>{s.name} ({s.amount} บาท)</option>)}
+              </Select>
+            </Field>
+          )}
+          <Field label="ชื่อรายการ"><Input placeholder={form.type === 'income' ? 'เช่น เงินเดือน' : 'เช่น ค่าอาหาร'} value={form.name || ''} onChange={e => setField('name', e.target.value)} /></Field>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}><Field label="จำนวนเงิน (บาท)"><Input type="number" placeholder="0" value={form.amount || ''} onChange={e => setField('amount', e.target.value)} /></Field></div>
+            <div style={{ flex: 1 }}><Field label="วันที่"><Input type="date" value={form.date || ''} onChange={e => setField('date', e.target.value)} /></Field></div>
+          </div>
+          <Field label="หมวดหมู่"><Select value={form.category || 'อาหาร'} onChange={e => setField('category', e.target.value)}>{(form.type === 'income' ? ['รายได้', 'อื่นๆ'] : TXN_CATS).map(k => <option key={k}>{k}</option>)}</Select></Field>
+          <ModalButtons onClose={() => setModal(null)} onSave={saveTxn} label="บันทึก" saving={saving} />
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+function NavBtn({ n, active, onClick }) {
+  return (
+    <button onClick={onClick} className="mt-btn" style={{ flex: 1, maxWidth: 80, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '4px 0', color: active ? 'var(--primary)' : 'var(--muted-2)', fontFamily: 'inherit' }}>
+      <Icon n={n.icon} s={22} />
+      <span style={{ fontSize: 10, fontWeight: active ? 700 : 600, whiteSpace: 'nowrap' }}>{n.short}</span>
+    </button>
+  )
+}
+
+function ImgBlock({ imgPreview, onChange }) {
+  return (
+    <Field label="รูปภาพ (ไม่บังคับ)">
+      <label className="mt-input" style={{ display: 'block', border: '2px dashed ' + (imgPreview ? 'var(--primary)' : 'var(--border)'), borderRadius: 14, padding: imgPreview ? 12 : 18, textAlign: 'center', cursor: 'pointer', background: 'var(--surface-2)' }}>
+        {imgPreview
+          ? <img src={imgPreview} alt="" style={{ width: 60, height: 60, borderRadius: 12, objectFit: 'cover', margin: '0 auto', display: 'block' }} />
+          : <><Icon n="ti-photo-plus" s={26} style={{ color: 'var(--muted-2)' }} /><div style={{ fontSize: 12.5, color: 'var(--muted-2)', marginTop: 6 }}>แตะเพื่ออัปโหลดรูป</div></>}
+        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={onChange} />
+      </label>
+    </Field>
+  )
+}
+
+function ModalButtons({ onClose, onSave, label, saving }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+      <button onClick={onClose} className="mt-btn" style={{ background: 'var(--surface-2)', border: '1.5px solid var(--border)', color: 'var(--text)', borderRadius: 13, padding: '12px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>ยกเลิก</button>
+      <button onClick={onSave} disabled={saving} className="mt-btn" style={{ flex: 1, border: 'none', background: 'var(--grad)', color: '#fff', borderRadius: 13, padding: '12px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 10px 22px -12px rgba(26,60,143,.9)', opacity: saving ? .7 : 1 }}>{saving ? 'กำลังบันทึก…' : label}</button>
     </div>
   )
 }
