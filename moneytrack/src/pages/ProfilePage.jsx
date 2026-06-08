@@ -1,24 +1,19 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
+import { Icon, Avatar, Field, Input, Toggle, Card } from '../components/MoneyUI'
 
-const s = {
-  page: { minHeight: '100vh', background: 'var(--bg)', fontFamily: 'var(--font)' },
-  topbar: { background: 'var(--primary)', padding: '13px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  logo: { fontSize: 18, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 },
-  content: { padding: 20, maxWidth: 500, margin: '0 auto' },
-  card: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, marginBottom: 14 },
-  label: { display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.5px' },
-  input: { width: '100%', background: 'var(--bg3)', border: '1.5px solid var(--border)', color: 'var(--text)', borderRadius: 10, padding: '9px 12px', fontSize: 14, fontFamily: 'var(--font)', outline: 'none', marginBottom: 14 },
-  btn: { background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', width: '100%' },
-  btnDanger: { background: 'var(--bg3)', color: 'var(--red)', border: '1.5px solid var(--red)', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', width: '100%' },
-  avatar: { width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--primary)' },
-  avatarPlaceholder: { width: 80, height: 80, borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 700, color: '#fff', border: '3px solid var(--primary)', flexShrink: 0 },
-  toggle: { width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative', transition: '.2s', flexShrink: 0 },
-  toggleKnob: { width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, transition: '.2s' },
-  row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' },
-  success: { background: '#e8f8f0', border: '1px solid #9ee5c4', color: '#0b6e4f', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 },
-  error: { background: '#fdeaea', border: '1px solid #f5b5b5', color: '#c0392b', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 },
+function Row({ title, desc, children, icon, iconColor }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '14px 0', borderBottom: '1px solid var(--border-2)' }}>
+      {icon && <div style={{ width: 38, height: 38, borderRadius: 11, background: iconColor + '1c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon n={icon} s={18} style={{ color: iconColor }} /></div>}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14.5, fontWeight: 600 }}>{title}</div>
+        <div style={{ fontSize: 12.5, color: 'var(--muted-2)', marginTop: 1 }}>{desc}</div>
+      </div>
+      {children}
+    </div>
+  )
 }
 
 export default function ProfilePage({ onBack, darkMode, setDarkMode }) {
@@ -45,8 +40,7 @@ export default function ProfilePage({ onBack, darkMode, setDarkMode }) {
   }
 
   const saveProfile = async () => {
-    setSaving(true)
-    setMsg({ type: '', text: '' })
+    setSaving(true); setMsg({ type: '', text: '' })
     try {
       let newAvatarUrl = avatarUrl
       if (avatarFile) {
@@ -57,9 +51,7 @@ export default function ProfilePage({ onBack, darkMode, setDarkMode }) {
         newAvatarUrl = data.publicUrl + '?t=' + Date.now()
         setAvatarUrl(newAvatarUrl)
       }
-      const { error } = await supabase.auth.updateUser({
-        data: { full_name: name, avatar_url: newAvatarUrl }
-      })
+      const { error } = await supabase.auth.updateUser({ data: { full_name: name, avatar_url: newAvatarUrl } })
       if (error) throw error
       setMsg({ type: 'success', text: 'บันทึกข้อมูลสำเร็จครับ!' })
     } catch (e) {
@@ -86,90 +78,54 @@ export default function ProfilePage({ onBack, darkMode, setDarkMode }) {
   }
 
   const signOut = () => supabase.auth.signOut()
-
   const initials = (name || user?.email || 'U').charAt(0).toUpperCase()
   const displayAvatar = avatarPreview || avatarUrl
 
   return (
-    <div style={s.page}>
-      <div style={s.topbar}>
-        <div style={s.logo}>
-          <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 20, padding: 0, display: 'flex', alignItems: 'center' }}>
-            <i className="ti ti-arrow-left" aria-hidden="true" />
-          </button>
-          <span style={{ marginLeft: 8 }}>โปรไฟล์</span>
-        </div>
-      </div>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-grad)' }}>
+      <header style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', maxWidth: 600, margin: '0 auto' }}>
+        <button onClick={onBack} className="mt-btn" style={{ width: 42, height: 42, borderRadius: 13, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: 'var(--shadow)' }}><Icon n="ti-arrow-left" s={20} /></button>
+        <span style={{ fontSize: 20, fontWeight: 800 }}>โปรไฟล์</span>
+      </header>
 
-      <div style={s.content}>
-        {/* Avatar + Name */}
-        <div style={s.card}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+      <div className="mt-anim" style={{ maxWidth: 560, margin: '0 auto', padding: '4px 20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
             {displayAvatar
-              ? <img src={displayAvatar} alt="avatar" style={s.avatar} />
-              : <div style={s.avatarPlaceholder}>{initials}</div>
-            }
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{name || 'ไม่ระบุชื่อ'}</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 3 }}>{user?.email}</div>
-              <button onClick={() => document.getElementById('avatar-input').click()}
-                style={{ marginTop: 8, background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--primary)', borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                <i className="ti ti-camera" aria-hidden="true" /> เปลี่ยนรูป
-              </button>
+              ? <img src={displayAvatar} alt="" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--primary)', flexShrink: 0 }} />
+              : <Avatar initial={initials} size={72} style={{ fontSize: 28, boxShadow: '0 14px 26px -12px rgba(26,60,143,.8)' }} />}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{name || 'ไม่ระบุชื่อ'}</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{user?.email}</div>
+              <button onClick={() => document.getElementById('avatar-input').click()} className="mt-btn" style={{ marginTop: 9, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--primary)', borderRadius: 10, padding: '6px 13px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon n="ti-camera" s={15} /> เปลี่ยนรูป</button>
               <input id="avatar-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
             </div>
           </div>
 
-          {msg.text && <div style={msg.type === 'success' ? s.success : s.error}>{msg.text}</div>}
+          {msg.text && <div style={{ background: msg.type === 'success' ? 'var(--teal-soft)' : 'var(--red-soft)', color: msg.type === 'success' ? 'var(--teal-ink)' : 'var(--red-ink)', borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 600, marginBottom: 14 }}>{msg.text}</div>}
 
-          <label style={s.label}>ชื่อ-นามสกุล</label>
-          <input style={s.input} value={name} onChange={e => setName(e.target.value)} placeholder="กรอกชื่อของคุณ" />
-
-          <label style={s.label}>อีเมล</label>
-          <input style={{ ...s.input, opacity: .6 }} value={user?.email} disabled />
-
-          <button style={{ ...s.btn, opacity: saving ? .7 : 1 }} onClick={saveProfile} disabled={saving}>
-            {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+          <Field label="ชื่อ-นามสกุล"><Input value={name} onChange={e => setName(e.target.value)} placeholder="กรอกชื่อของคุณ" /></Field>
+          <Field label="อีเมล"><Input value={user?.email || ''} disabled style={{ opacity: .6 }} /></Field>
+          <button onClick={saveProfile} disabled={saving} className="mt-btn" style={{ width: '100%', border: 'none', background: 'var(--grad)', color: '#fff', borderRadius: 14, padding: '12px 0', fontSize: 14.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 12px 24px -12px rgba(26,60,143,.9)', opacity: saving ? .7 : 1 }}>
+            {saving ? 'กำลังบันทึก…' : 'บันทึกข้อมูล'}
           </button>
-        </div>
+        </Card>
 
-        {/* การแจ้งเตือน */}
-        <div style={s.card}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>การตั้งค่า</div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>ปรับแต่งประสบการณ์การใช้งาน</div>
-
-          <div style={s.row}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>Dark Mode</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>ธีมสีเข้ม</div>
+        <Card>
+          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 2 }}>การตั้งค่า</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted-2)', marginBottom: 10 }}>ปรับแต่งประสบการณ์การใช้งาน</div>
+          <Row title="โหมดมืด" desc="ธีมสีเข้มถนอมสายตา" icon="ti-moon" iconColor="#6f5bd0"><Toggle on={darkMode} onChange={() => setDarkMode(p => !p)} /></Row>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '14px 0' }}>
+            <div style={{ width: 38, height: 38, borderRadius: 11, background: '#f39c121c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon n="ti-bell" s={18} style={{ color: '#f39c12' }} /></div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 600 }}>Push Notification</div>
+              <div style={{ fontSize: 12.5, color: 'var(--muted-2)', marginTop: 1 }}>{!pushSupported ? 'เบราว์เซอร์ไม่รองรับ' : pushEnabled ? 'เปิดอยู่' : 'ปิดอยู่'}</div>
             </div>
-            <button onClick={() => setDarkMode(p => !p)}
-              style={{ ...s.toggle, background: darkMode ? 'var(--primary)' : 'var(--bg3)' }}>
-              <div style={{ ...s.toggleKnob, left: darkMode ? 23 : 3 }} />
-            </button>
+            <Toggle on={pushEnabled} onChange={togglePush} color="var(--teal)" />
           </div>
+        </Card>
 
-          <div style={{ ...s.row, borderBottom: 'none' }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>
-                <i className="ti ti-bell" aria-hidden="true" style={{ marginRight: 6, color: 'var(--amber)' }} />
-                Push Notification
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                {!pushSupported ? 'เบราว์เซอร์ไม่รองรับ' : pushEnabled ? 'เปิดอยู่' : 'ปิดอยู่'}
-              </div>
-            </div>
-            <button onClick={togglePush} disabled={!pushSupported}
-              style={{ ...s.toggle, background: pushEnabled ? 'var(--teal)' : 'var(--bg3)', opacity: pushSupported ? 1 : .4 }}>
-              <div style={{ ...s.toggleKnob, left: pushEnabled ? 23 : 3 }} />
-            </button>
-          </div>
-        </div>
-
-        {/* ออกจากระบบ */}
-        <button style={s.btnDanger} onClick={signOut}>
-          <i className="ti ti-logout" aria-hidden="true" /> ออกจากระบบ
-        </button>
+        <button onClick={signOut} className="mt-btn" style={{ background: 'var(--surface)', color: 'var(--red-ink)', border: '1.5px solid var(--red)', borderRadius: 16, padding: '13px 0', fontSize: 14.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', boxShadow: 'var(--shadow)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Icon n="ti-logout" s={18} /> ออกจากระบบ</button>
       </div>
     </div>
   )
